@@ -6,7 +6,7 @@ audio URLs, titles, descriptions, and publication dates.
 
 import hashlib
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -54,7 +54,7 @@ class PodcastFeed(BaseModel):
     language: str = Field(default="en", description="Podcast language")
     episodes: list[Episode] = Field(default_factory=list, description="List of episodes")
     last_fetched: datetime = Field(
-        default_factory=datetime.utcnow, description="When feed was last fetched"
+        default_factory=lambda: datetime.now(UTC), description="When feed was last fetched"
     )
 
     @computed_field

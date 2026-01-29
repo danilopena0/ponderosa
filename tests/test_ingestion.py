@@ -4,10 +4,18 @@ import pytest
 
 from ponderosa.ingestion.rss_parser import Episode, PodcastFeed, RSSParser
 
+# Mark for tests requiring network access
+network = pytest.mark.skipif(
+    True,  # Set to False when running integration tests locally
+    reason="Requires network access - run with pytest -m integration",
+)
+
 
 class TestRSSParser:
     """Tests for RSS feed parsing."""
 
+    @pytest.mark.integration
+    @network
     def test_parse_live_feed(self, sample_rss_feed_url: str) -> None:
         """Test parsing a real RSS feed."""
         parser = RSSParser(max_episodes=3)
@@ -18,6 +26,8 @@ class TestRSSParser:
         assert len(feed.episodes) <= 3
         assert len(feed.episodes) > 0
 
+    @pytest.mark.integration
+    @network
     def test_episode_has_required_fields(self, sample_rss_feed_url: str) -> None:
         """Test that parsed episodes have all required fields."""
         parser = RSSParser(max_episodes=1)
@@ -56,6 +66,8 @@ class TestRSSParser:
 
         assert feed.slug == "the-best-podcast-ever"
 
+    @pytest.mark.integration
+    @network
     def test_max_episodes_limit(self, sample_rss_feed_url: str) -> None:
         """Test that max_episodes limit is respected."""
         parser = RSSParser(max_episodes=2)
@@ -80,6 +92,8 @@ class TestRSSParser:
         assert parser._parse_duration(None) is None
         assert parser._parse_duration("") is None
 
+    @pytest.mark.integration
+    @network
     def test_invalid_feed_url_raises(self) -> None:
         """Test that invalid feed URL raises ValueError."""
         parser = RSSParser()

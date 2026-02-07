@@ -16,43 +16,64 @@ Ponderosa demonstrates deep Vertex AI expertise through a complete podcast proce
 
 ### Prerequisites
 
-- Python 3.12+
-- [uv](https://github.com/astral-sh/uv) package manager
-- Google Cloud account ([$300 free credits](https://cloud.google.com/free))
+- Python 3.13+
+- [uv](https://docs.astral.sh/uv/) package manager
+- Google Cloud account ([$300 free credits](https://cloud.google.com/free)) — optional, only needed for cloud features
 
 ### Installation
 
+#### Linux / macOS
+
 ```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Clone the repository
 git clone https://github.com/yourusername/ponderosa.git
 cd ponderosa
 
-# Install dependencies
-make install-dev
+# Create virtual environment and install dependencies
+uv venv --python 3.13
+source .venv/bin/activate
+uv sync --all-extras
 
 # Copy environment template
 cp .env.example .env
-# Edit .env with your GCP settings
 ```
 
-### Test RSS Parser (No GCP Required)
+#### Windows (PowerShell)
+
+```powershell
+# Install uv
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Add uv to PATH permanently (restart terminal after this)
+[Environment]::SetEnvironmentVariable("PATH", $env:PATH + ";$env:USERPROFILE\.local\bin", "User")
+
+# Clone the repository
+git clone https://github.com/yourusername/ponderosa.git
+cd ponderosa
+
+# Create virtual environment and install dependencies
+uv venv --python 3.13
+.venv\Scripts\activate
+uv sync --all-extras
+
+# Copy environment template
+copy .env.example .env
+```
+
+> **Note:** If PowerShell blocks the activate script, run:
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
+
+### Try It Out (No GCP Required)
 
 ```bash
 # Parse a podcast feed
-make run-parser
+uv run ponderosa parse-feed "https://flirtingwithmodels.libsyn.com/rss" -n 5
 
-# Or directly:
-uv run ponderosa parse-feed "https://flirtingwithmodels.libsyn.com/rss"
-```
-
-### Download Episodes Locally
-
-```bash
-# Download 1 episode to ./downloads
-make run-download
-
-# Or with options:
-uv run ponderosa download "https://flirtingwithmodels.libsyn.com/rss" -n 3 -o ./my-podcasts
+# Download 1 episode locally
+uv run ponderosa download "https://flirtingwithmodels.libsyn.com/rss" -n 1 -o downloads
 ```
 
 ## GCP Setup

@@ -16,9 +16,9 @@ class GCPSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="GCP_")
 
-    project_id: str = Field(description="GCP project ID")
+    project_id: str = Field(default="", description="GCP project ID")
     region: str = Field(default="us-central1", description="GCP region for resources")
-    bucket_name: str = Field(description="GCS bucket for audio and transcripts")
+    bucket_name: str = Field(default="", description="GCS bucket for audio and transcripts")
 
 
 class SpeechSettings(BaseSettings):

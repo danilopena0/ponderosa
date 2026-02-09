@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run pytest:*)",
+      "Bash(tmux:*)",
+      "Bash(uv run python -m pytest:*)",
+      "Bash(uv run:*)",
+      "Bash(uv pip install:*)",
+      "Bash(uv pip show:*)",
+      "Bash(kill:*)"
+    ]
+  }
+}

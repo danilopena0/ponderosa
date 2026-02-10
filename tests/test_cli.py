@@ -1,13 +1,12 @@
 """Tests for CLI commands."""
 
 import json
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ponderosa.cli import cmd_download, cmd_list_bucket, cmd_parse_feed, main
+from ponderosa.cli import cmd_download, cmd_parse_feed, cmd_transcribe, main
 from ponderosa.ingestion.rss_parser import Episode, PodcastFeed
 
 
@@ -128,8 +127,7 @@ class TestDownload:
     @patch("ponderosa.cli.setup_logging")
     @patch("ponderosa.cli.AudioDownloader")
     @patch("ponderosa.cli.RSSParser")
-    @patch("ponderosa.cli.get_settings")
-    def test_basic_download(self, mock_settings, mock_parser_cls, mock_dl_cls, _mock_logging, capsys, tmp_path):
+    def test_basic_download(self, mock_parser_cls, mock_dl_cls, _mock_logging, capsys, tmp_path):
         feed = _make_feed(1)
         mock_parser_cls.return_value.parse_feed.return_value = feed
         mock_dl_cls.return_value.download_feed.return_value = {"ep0000000000": tmp_path / "ep0.mp3"}
@@ -142,15 +140,13 @@ class TestDownload:
         assert "Test Podcast" in output
         assert "Downloaded 1 episodes" in output
 
-        # Verify download_feed called with skip_existing=True (default, no --force)
         call_kwargs = mock_dl_cls.return_value.download_feed.call_args
         assert call_kwargs.kwargs.get("skip_existing") is True or call_kwargs[1].get("skip_existing") is True
 
     @patch("ponderosa.cli.setup_logging")
     @patch("ponderosa.cli.AudioDownloader")
     @patch("ponderosa.cli.RSSParser")
-    @patch("ponderosa.cli.get_settings")
-    def test_force_flag(self, mock_settings, mock_parser_cls, mock_dl_cls, _mock_logging, tmp_path):
+    def test_force_flag(self, mock_parser_cls, mock_dl_cls, _mock_logging, tmp_path):
         feed = _make_feed(1)
         mock_parser_cls.return_value.parse_feed.return_value = feed
         mock_dl_cls.return_value.download_feed.return_value = {}
@@ -162,46 +158,9 @@ class TestDownload:
         assert call_kwargs.kwargs.get("skip_existing") is False or call_kwargs[1].get("skip_existing") is False
 
     @patch("ponderosa.cli.setup_logging")
-    @patch("ponderosa.cli.GCSClient")
     @patch("ponderosa.cli.AudioDownloader")
     @patch("ponderosa.cli.RSSParser")
-    @patch("ponderosa.cli.get_settings")
-    def test_upload_flag_creates_gcs_client(self, mock_settings, mock_parser_cls, mock_dl_cls, mock_gcs_cls, _mock_logging):
-        feed = _make_feed(1)
-        mock_parser_cls.return_value.parse_feed.return_value = feed
-        mock_dl_cls.return_value.download_feed.return_value = {}
-        mock_settings.return_value.gcp.bucket_name = "test-bucket"
-        mock_settings.return_value.gcp.project_id = "test-project"
-
-        with patch("sys.argv", ["ponderosa", "download", "--upload", "https://example.com/rss"]):
-            main()
-
-        mock_gcs_cls.assert_called_once_with(
-            bucket_name="test-bucket",
-            project_id="test-project",
-        )
-
-    @patch("ponderosa.cli.setup_logging")
-    @patch("ponderosa.cli.AudioDownloader")
-    @patch("ponderosa.cli.RSSParser")
-    @patch("ponderosa.cli.get_settings")
-    def test_no_upload_without_bucket(self, mock_settings, mock_parser_cls, mock_dl_cls, _mock_logging):
-        feed = _make_feed(1)
-        mock_parser_cls.return_value.parse_feed.return_value = feed
-        mock_dl_cls.return_value.download_feed.return_value = {}
-        mock_settings.return_value.gcp.bucket_name = ""
-
-        with patch("sys.argv", ["ponderosa", "download", "--upload", "https://example.com/rss"]):
-            main()
-
-        # AudioDownloader should be created with gcs_client=None
-        mock_dl_cls.assert_called_once_with(gcs_client=None)
-
-    @patch("ponderosa.cli.setup_logging")
-    @patch("ponderosa.cli.AudioDownloader")
-    @patch("ponderosa.cli.RSSParser")
-    @patch("ponderosa.cli.get_settings")
-    def test_output_dir(self, mock_settings, mock_parser_cls, mock_dl_cls, _mock_logging, tmp_path):
+    def test_output_dir(self, mock_parser_cls, mock_dl_cls, _mock_logging, tmp_path):
         feed = _make_feed(1)
         mock_parser_cls.return_value.parse_feed.return_value = feed
         mock_dl_cls.return_value.download_feed.return_value = {}
@@ -216,8 +175,7 @@ class TestDownload:
     @patch("ponderosa.cli.setup_logging")
     @patch("ponderosa.cli.AudioDownloader")
     @patch("ponderosa.cli.RSSParser")
-    @patch("ponderosa.cli.get_settings")
-    def test_max_episodes_passed(self, mock_settings, mock_parser_cls, mock_dl_cls, _mock_logging):
+    def test_max_episodes_passed(self, mock_parser_cls, mock_dl_cls, _mock_logging):
         feed = _make_feed(1)
         mock_parser_cls.return_value.parse_feed.return_value = feed
         mock_dl_cls.return_value.download_feed.return_value = {}
@@ -228,76 +186,109 @@ class TestDownload:
         mock_parser_cls.assert_called_once_with(max_episodes=7)
 
 
-class TestListBucket:
-    """Tests for the list-bucket command."""
-
-    @patch("ponderosa.cli.setup_logging")
-    @patch("ponderosa.cli.GCSClient")
-    @patch("ponderosa.cli.get_settings")
-    def test_basic_list(self, mock_settings, mock_gcs_cls, _mock_logging, capsys):
-        mock_settings.return_value.gcp.bucket_name = "my-bucket"
-        mock_settings.return_value.gcp.project_id = "my-project"
-        mock_gcs_cls.return_value.list_blobs.return_value = ["audio/ep1.mp3", "audio/ep2.mp3"]
-
-        with patch("sys.argv", ["ponderosa", "list-bucket"]):
-            result = main()
-
-        assert result == 0
-        output = capsys.readouterr().out
-        assert "my-bucket" in output
-        assert "audio/ep1.mp3" in output
-        assert "audio/ep2.mp3" in output
-        assert "Found 2 objects" in output
+class TestTranscribe:
+    """Tests for the transcribe command."""
 
     @patch("ponderosa.cli.setup_logging")
     @patch("ponderosa.cli.get_settings")
-    def test_no_bucket_configured(self, mock_settings, _mock_logging, capsys):
-        mock_settings.return_value.gcp.bucket_name = ""
+    def test_file_not_found(self, mock_settings, _mock_logging, capsys):
+        mock_settings.return_value.whisper.model_size = "base"
 
-        with patch("sys.argv", ["ponderosa", "list-bucket"]):
+        with patch("sys.argv", ["ponderosa", "transcribe", "/nonexistent/audio.mp3"]):
             result = main()
 
         assert result == 1
         output = capsys.readouterr().out
-        assert "GCP_BUCKET_NAME not configured" in output
+        assert "File not found" in output
 
     @patch("ponderosa.cli.setup_logging")
-    @patch("ponderosa.cli.GCSClient")
     @patch("ponderosa.cli.get_settings")
-    def test_prefix_filter(self, mock_settings, mock_gcs_cls, _mock_logging, capsys):
-        mock_settings.return_value.gcp.bucket_name = "my-bucket"
-        mock_settings.return_value.gcp.project_id = "my-project"
-        mock_gcs_cls.return_value.list_blobs.return_value = ["audio/ep1.mp3"]
+    @patch("faster_whisper.WhisperModel")
+    def test_basic_transcribe(self, mock_whisper_cls, mock_settings, _mock_logging, tmp_path, capsys):
+        mock_settings.return_value.whisper.model_size = "base"
+        mock_settings.return_value.whisper.device = "cpu"
+        mock_settings.return_value.whisper.compute_type = "int8"
+        mock_settings.return_value.whisper.language = "en"
 
-        with patch("sys.argv", ["ponderosa", "list-bucket", "--prefix", "audio/"]):
-            main()
+        # Create a fake audio file
+        audio_file = tmp_path / "test.mp3"
+        audio_file.write_bytes(b"fake audio data")
 
-        mock_gcs_cls.return_value.list_blobs.assert_called_once_with(prefix="audio/", max_results=100)
+        # Mock the whisper model
+        mock_segment = MagicMock()
+        mock_segment.start = 0.0
+        mock_segment.end = 5.0
+        mock_segment.text = " Hello world"
 
-    @patch("ponderosa.cli.setup_logging")
-    @patch("ponderosa.cli.GCSClient")
-    @patch("ponderosa.cli.get_settings")
-    def test_max_results(self, mock_settings, mock_gcs_cls, _mock_logging):
-        mock_settings.return_value.gcp.bucket_name = "my-bucket"
-        mock_settings.return_value.gcp.project_id = "my-project"
-        mock_gcs_cls.return_value.list_blobs.return_value = []
+        mock_info = MagicMock()
+        mock_info.language = "en"
+        mock_info.duration = 5.0
 
-        with patch("sys.argv", ["ponderosa", "list-bucket", "-n", "50"]):
-            main()
+        mock_whisper_cls.return_value.transcribe.return_value = (iter([mock_segment]), mock_info)
 
-        mock_gcs_cls.return_value.list_blobs.assert_called_once_with(prefix=None, max_results=50)
-
-    @patch("ponderosa.cli.setup_logging")
-    @patch("ponderosa.cli.GCSClient")
-    @patch("ponderosa.cli.get_settings")
-    def test_empty_bucket(self, mock_settings, mock_gcs_cls, _mock_logging, capsys):
-        mock_settings.return_value.gcp.bucket_name = "my-bucket"
-        mock_settings.return_value.gcp.project_id = "my-project"
-        mock_gcs_cls.return_value.list_blobs.return_value = []
-
-        with patch("sys.argv", ["ponderosa", "list-bucket"]):
+        with patch("sys.argv", ["ponderosa", "transcribe", str(audio_file)]):
             result = main()
 
         assert result == 0
+
+        # Check transcript JSON was created
+        transcript_file = audio_file.with_suffix(".transcript.json")
+        assert transcript_file.exists()
+        data = json.loads(transcript_file.read_text())
+        assert data["text"] == "Hello world"
+        assert data["language"] == "en"
+        assert len(data["segments"]) == 1
+
+    @patch("ponderosa.cli.setup_logging")
+    @patch("ponderosa.cli.get_settings")
+    @patch("faster_whisper.WhisperModel")
+    def test_custom_output_path(self, mock_whisper_cls, mock_settings, _mock_logging, tmp_path):
+        mock_settings.return_value.whisper.model_size = "base"
+        mock_settings.return_value.whisper.device = "cpu"
+        mock_settings.return_value.whisper.compute_type = "int8"
+        mock_settings.return_value.whisper.language = "en"
+
+        audio_file = tmp_path / "test.mp3"
+        audio_file.write_bytes(b"fake audio data")
+        output_file = tmp_path / "custom_output.json"
+
+        mock_segment = MagicMock()
+        mock_segment.start = 0.0
+        mock_segment.end = 3.0
+        mock_segment.text = " Test"
+
+        mock_info = MagicMock()
+        mock_info.language = "en"
+        mock_info.duration = 3.0
+
+        mock_whisper_cls.return_value.transcribe.return_value = (iter([mock_segment]), mock_info)
+
+        with patch("sys.argv", ["ponderosa", "transcribe", "-o", str(output_file), str(audio_file)]):
+            result = main()
+
+        assert result == 0
+        assert output_file.exists()
+
+    @patch("ponderosa.cli.setup_logging")
+    @patch("ponderosa.cli.get_settings")
+    @patch("faster_whisper.WhisperModel")
+    def test_model_flag(self, mock_whisper_cls, mock_settings, _mock_logging, tmp_path, capsys):
+        mock_settings.return_value.whisper.model_size = "base"
+        mock_settings.return_value.whisper.device = "cpu"
+        mock_settings.return_value.whisper.compute_type = "int8"
+        mock_settings.return_value.whisper.language = "en"
+
+        audio_file = tmp_path / "test.mp3"
+        audio_file.write_bytes(b"fake audio data")
+
+        mock_info = MagicMock()
+        mock_info.language = "en"
+        mock_info.duration = 1.0
+
+        mock_whisper_cls.return_value.transcribe.return_value = (iter([]), mock_info)
+
+        with patch("sys.argv", ["ponderosa", "transcribe", "-m", "large-v3", str(audio_file)]):
+            main()
+
         output = capsys.readouterr().out
-        assert "Found 0 objects" in output
+        assert "large-v3" in output

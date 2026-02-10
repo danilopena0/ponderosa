@@ -7,7 +7,9 @@
       "Bash(uv run:*)",
       "Bash(uv pip install:*)",
       "Bash(uv pip show:*)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(grep:*)",
+      "Bash(uv sync:*)"
     ]
   }
 }

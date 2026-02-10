@@ -1,19 +1,12 @@
 [project]
 name = "ponderosa"
 version = "0.1.0"
-description = "Podcast Intelligence Pipeline - Vertex AI MLOps project for podcast transcription, enrichment, and semantic search"
+description = "Podcast Intelligence Pipeline - Local transcription and enrichment for podcasts"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    # Core GCP services
-    "google-cloud-aiplatform>=1.38.0",
-    "google-cloud-speech>=2.21.0",
-    "google-cloud-storage>=2.13.0",
-    "google-cloud-bigquery>=3.13.0",
-
-    # Vertex AI Pipelines
-    "kfp>=2.4.0",
-    "google-cloud-pipeline-components>=2.6.0",
+    # Transcription
+    "faster-whisper>=1.0.0",
 
     # Podcast ingestion
     "feedparser>=6.0.10",

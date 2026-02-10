@@ -1,16 +1,16 @@
 # Ponderosa - Podcast Intelligence Pipeline
 
-A production-grade MLOps pipeline for podcast transcription, enrichment, and semantic search using Vertex AI.
+A local-first pipeline for podcast transcription, enrichment, and semantic search.
 
 ## Overview
 
-Ponderosa demonstrates deep Vertex AI expertise through a complete podcast processing pipeline:
+Ponderosa processes podcasts through a complete pipeline — all running locally with no cloud dependencies:
 
-1. **Ingestion** - Parse RSS feeds and download audio to Cloud Storage
-2. **Transcription** - Convert audio to text using Speech-to-Text (Chirp 3)
-3. **Enrichment** - Summarize and extract topics using Gemini
-4. **Search** - Semantic search via Vertex AI Vector Search
-5. **API** - FastAPI interface deployed on Cloud Run
+1. **Ingestion** - Parse RSS feeds and download audio locally
+2. **Transcription** - Convert audio to text using faster-whisper (local Whisper)
+3. **Enrichment** - Summarize and extract topics (coming soon)
+4. **Search** - Semantic search (coming soon)
+5. **API** - FastAPI interface (coming soon)
 
 ## Quick Start
 
@@ -18,7 +18,6 @@ Ponderosa demonstrates deep Vertex AI expertise through a complete podcast proce
 
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/) package manager
-- Google Cloud account ([$300 free credits](https://cloud.google.com/free)) — optional, only needed for cloud features
 
 ### Installation
 
@@ -66,7 +65,7 @@ copy .env.example .env
 > **Note:** If PowerShell blocks the activate script, run:
 > `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 
-### Try It Out (No GCP Required)
+### Try It Out
 
 ```bash
 # Parse a podcast feed
@@ -74,15 +73,68 @@ uv run ponderosa parse-feed "https://flirtingwithmodels.libsyn.com/rss" -n 5
 
 # Download 1 episode locally
 uv run ponderosa download "https://flirtingwithmodels.libsyn.com/rss" -n 1 -o downloads
+
+# Transcribe a downloaded episode
+uv run ponderosa transcribe downloads/some_episode.mp3
 ```
 
-## GCP Setup
+## CLI Commands
 
-See [docs/GCP_SETUP.md](docs/GCP_SETUP.md) for detailed instructions on:
-- Creating a GCP project with free credits
-- Enabling required APIs
-- Setting up authentication
-- Configuring billing alerts
+### `parse-feed` - Parse an RSS feed
+
+```bash
+uv run ponderosa parse-feed <feed_url> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-n`, `--max-episodes` | Max episodes to parse (default: 10) |
+| `-o`, `--output` | Save feed data as JSON |
+
+### `download` - Download episodes from a feed
+
+```bash
+uv run ponderosa download <feed_url> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-n`, `--max-episodes` | Max episodes to download (default: 5) |
+| `-o`, `--output` | Output directory (default: `./downloads`) |
+| `-f`, `--force` | Re-download existing files |
+
+### `transcribe` - Transcribe a local audio file
+
+```bash
+uv run ponderosa transcribe <audio_file> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-m`, `--model` | Whisper model size: `tiny`, `base`, `small`, `medium`, `large-v3` (default: `base`) |
+| `-o`, `--output` | Output path for transcript JSON (default: `<audio_file>.transcript.json`) |
+
+The transcript JSON includes the full text, timestamped segments, detected language, and duration.
+
+## Configuration
+
+Configuration is loaded from environment variables or a `.env` file. See [.env.example](.env.example) for all options.
+
+### Whisper Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WHISPER_MODEL_SIZE` | `base` | Model size (`tiny`, `base`, `small`, `medium`, `large-v3`) |
+| `WHISPER_DEVICE` | `cpu` | Device (`cpu` or `cuda`) |
+| `WHISPER_COMPUTE_TYPE` | `int8` | Compute type (`int8`, `float16`, `float32`) |
+| `WHISPER_LANGUAGE` | `en` | Language code |
+
+### Podcast Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PODCAST_MAX_EPISODES_PER_FEED` | `10` | Max episodes per feed |
+| `PODCAST_SKIP_EXISTING` | `true` | Skip already-downloaded episodes |
 
 ## Project Structure
 
@@ -93,12 +145,10 @@ ponderosa/
 │   ├── cli.py              # Command-line interface
 │   ├── logging.py          # Structured logging setup
 │   ├── ingestion/          # RSS parsing & audio download
-│   ├── transcription/      # Speech-to-Text integration
-│   ├── enrichment/         # Gemini summarization
-│   ├── storage/            # GCS & BigQuery clients
-│   └── search/             # Vector search
-├── pipelines/              # Vertex AI Pipeline definitions
-├── api/                    # FastAPI application
+│   ├── transcription/      # faster-whisper transcription
+│   ├── enrichment/         # Summarization (planned)
+│   ├── storage/            # Storage utilities (planned)
+│   └── search/             # Semantic search (planned)
 ├── tests/                  # Test suite
 └── docs/                   # Documentation
 ```
@@ -107,64 +157,17 @@ ponderosa/
 
 ```bash
 # Run tests
-make test
+uv run pytest
+
+# Run tests with verbose output
+uv run pytest -v
 
 # Run linter
-make lint
+uv run ruff check .
 
 # Format code
-make format
-
-# Type checking
-make typecheck
-
-# Run all checks
-make check
+uv run ruff format .
 ```
-
-## Architecture
-
-```
-┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│   RSS Feed   │───▶│   Cloud      │───▶│  Speech-to-  │
-│   Parser     │    │   Storage    │    │  Text API    │
-└──────────────┘    └──────────────┘    └──────────────┘
-                                               │
-                    ┌──────────────────────────┼──────────────────────┐
-                    ▼                          ▼                      ▼
-             ┌──────────────┐          ┌──────────────┐       ┌──────────────┐
-             │  Gemini API  │          │  Embedding   │       │   BigQuery   │
-             │  Summarize   │          │  Generation  │       │   Metadata   │
-             └──────────────┘          └──────────────┘       └──────────────┘
-                    │                          │
-                    └────────────┬─────────────┘
-                                 ▼
-                          ┌──────────────┐
-                          │  Vertex AI   │
-                          │  Vector      │
-                          │  Search      │
-                          └──────────────┘
-                                 │
-                                 ▼
-                          ┌──────────────┐
-                          │  FastAPI     │
-                          │  (Cloud Run) │
-                          └──────────────┘
-```
-
-## Cost Optimization
-
-| Service | Free Tier | Batch Rate | Strategy |
-|---------|-----------|------------|----------|
-| Speech-to-Text | 60 min/month | $0.004/min | Use batch mode |
-| Vertex AI Pipelines | Free (preview) | - | No cost |
-| Cloud Storage | 5 GB | $0.020/GB | Minimal |
-| Gemini Flash | Free tier | Per token | Use Flash not Pro |
-
-**Tips:**
-- Set billing alerts at $50, $100, $200
-- Undeploy Vector Search endpoints when not demoing
-- Use batch mode for transcription (75% cheaper)
 
 ## License
 

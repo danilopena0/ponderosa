@@ -4,42 +4,9 @@ import pytest
 
 from ponderosa.ingestion.rss_parser import Episode, PodcastFeed, RSSParser
 
-# Mark for tests requiring network access
-network = pytest.mark.skipif(
-    True,  # Set to False when running integration tests locally
-    reason="Requires network access - run with pytest -m integration",
-)
-
 
 class TestRSSParser:
     """Tests for RSS feed parsing."""
-
-    @pytest.mark.integration
-    @network
-    def test_parse_live_feed(self, sample_rss_feed_url: str) -> None:
-        """Test parsing a real RSS feed."""
-        parser = RSSParser(max_episodes=3)
-        feed = parser.parse_feed(sample_rss_feed_url)
-
-        assert isinstance(feed, PodcastFeed)
-        assert feed.title == "Flirting with Models"
-        assert len(feed.episodes) <= 3
-        assert len(feed.episodes) > 0
-
-    @pytest.mark.integration
-    @network
-    def test_episode_has_required_fields(self, sample_rss_feed_url: str) -> None:
-        """Test that parsed episodes have all required fields."""
-        parser = RSSParser(max_episodes=1)
-        feed = parser.parse_feed(sample_rss_feed_url)
-
-        episode = feed.episodes[0]
-
-        assert episode.id is not None
-        assert len(episode.id) == 12  # SHA256 hash prefix
-        assert episode.title is not None
-        assert episode.audio_url is not None
-        assert str(episode.audio_url).startswith("http")
 
     def test_episode_audio_filename_generation(self) -> None:
         """Test audio filename generation."""
@@ -66,15 +33,6 @@ class TestRSSParser:
 
         assert feed.slug == "the-best-podcast-ever"
 
-    @pytest.mark.integration
-    @network
-    def test_max_episodes_limit(self, sample_rss_feed_url: str) -> None:
-        """Test that max_episodes limit is respected."""
-        parser = RSSParser(max_episodes=2)
-        feed = parser.parse_feed(sample_rss_feed_url)
-
-        assert len(feed.episodes) <= 2
-
     def test_duration_parsing(self) -> None:
         """Test duration string parsing."""
         parser = RSSParser()
@@ -91,16 +49,6 @@ class TestRSSParser:
         # None handling
         assert parser._parse_duration(None) is None
         assert parser._parse_duration("") is None
-
-    @pytest.mark.integration
-    @network
-    def test_invalid_feed_url_raises(self) -> None:
-        """Test that invalid feed URL raises ValueError."""
-        parser = RSSParser()
-
-        with pytest.raises(ValueError, match="Failed to parse"):
-            parser.parse_feed("https://example.com/not-a-feed")
-
 
 class TestEpisodeModel:
     """Tests for Episode Pydantic model."""

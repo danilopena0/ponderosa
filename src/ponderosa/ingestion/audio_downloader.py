@@ -1,7 +1,7 @@
-"""Audio downloader for fetching podcast episodes and uploading to GCS.
+"""Audio downloader for fetching podcast episodes.
 
-Handles downloading audio files from URLs with retry logic,
-progress tracking, and optional upload to Google Cloud Storage.
+Handles downloading audio files from URLs with retry logic
+and progress tracking.
 """
 
 import tempfile
@@ -17,7 +17,6 @@ from tenacity import (
 )
 
 from ponderosa.ingestion.rss_parser import Episode, PodcastFeed
-from ponderosa.storage.gcs_client import GCSClient
 
 logger = structlog.get_logger(__name__)
 
@@ -29,22 +28,19 @@ class DownloadError(Exception):
 
 
 class AudioDownloader:
-    """Downloads podcast audio files and uploads to GCS."""
+    """Downloads podcast audio files to local storage."""
 
     def __init__(
         self,
-        gcs_client: GCSClient | None = None,
         timeout_seconds: int = 300,
         chunk_size: int = 8192,
     ) -> None:
         """Initialize the audio downloader.
 
         Args:
-            gcs_client: Optional GCS client for cloud uploads.
             timeout_seconds: HTTP request timeout.
             chunk_size: Chunk size for streaming downloads.
         """
-        self.gcs_client = gcs_client
         self.timeout = timeout_seconds
         self.chunk_size = chunk_size
         self.logger = logger.bind(component="audio_downloader")
@@ -58,19 +54,15 @@ class AudioDownloader:
         self,
         episode: Episode,
         local_dir: Path | None = None,
-        upload_to_gcs: bool = True,
-        gcs_prefix: str = "audio",
-    ) -> Path | str:
+    ) -> Path:
         """Download a single episode audio file.
 
         Args:
             episode: Episode to download.
             local_dir: Local directory for download (uses temp if None).
-            upload_to_gcs: Whether to upload to GCS after download.
-            gcs_prefix: GCS path prefix for uploads.
 
         Returns:
-            Local path if not uploading, GCS URI if uploading.
+            Local path to downloaded file.
 
         Raises:
             DownloadError: If download fails after retries.
@@ -98,17 +90,6 @@ class AudioDownloader:
             size_mb=round(local_path.stat().st_size / (1024 * 1024), 2),
         )
 
-        # Upload to GCS if configured
-        if upload_to_gcs and self.gcs_client:
-            gcs_path = f"{gcs_prefix}/{episode.audio_filename}"
-            gcs_uri = self.gcs_client.upload_file(local_path, gcs_path)
-
-            # Clean up local file after upload
-            local_path.unlink(missing_ok=True)
-
-            self.logger.info("Uploaded to GCS", uri=gcs_uri)
-            return gcs_uri
-
         return local_path
 
     def _download_file(self, url: str, dest_path: Path) -> None:
@@ -132,19 +113,17 @@ class AudioDownloader:
         self,
         feed: PodcastFeed,
         local_dir: Path | None = None,
-        upload_to_gcs: bool = True,
         skip_existing: bool = True,
-    ) -> dict[str, Path | str]:
+    ) -> dict[str, Path]:
         """Download all episodes from a podcast feed.
 
         Args:
             feed: Podcast feed with episodes to download.
             local_dir: Local directory for downloads.
-            upload_to_gcs: Whether to upload to GCS.
-            skip_existing: Skip episodes already in GCS.
+            skip_existing: Skip episodes already downloaded locally.
 
         Returns:
-            Dict mapping episode IDs to their paths/URIs.
+            Dict mapping episode IDs to their local paths.
         """
         self.logger.info(
             "Downloading feed",
@@ -152,29 +131,22 @@ class AudioDownloader:
             episode_count=len(feed.episodes),
         )
 
-        results: dict[str, Path | str] = {}
-        gcs_prefix = f"audio/{feed.slug}"
+        results: dict[str, Path] = {}
 
         for episode in feed.episodes:
-            # Check if already exists in GCS
-            if skip_existing and upload_to_gcs and self.gcs_client:
-                gcs_path = f"{gcs_prefix}/{episode.audio_filename}"
-                if self.gcs_client.exists(gcs_path):
+            # Check if already exists locally
+            if skip_existing and local_dir:
+                local_path = local_dir / episode.audio_filename
+                if local_path.exists():
                     self.logger.info("Skipping existing episode", title=episode.title)
-                    results[episode.id] = self.gcs_client.get_uri(gcs_path)
+                    results[episode.id] = local_path
                     continue
 
             try:
-                result = self.download_episode(
-                    episode,
-                    local_dir=local_dir,
-                    upload_to_gcs=upload_to_gcs,
-                    gcs_prefix=gcs_prefix,
-                )
+                result = self.download_episode(episode, local_dir=local_dir)
                 results[episode.id] = result
             except DownloadError as e:
                 self.logger.error("Failed to download episode", title=episode.title, error=str(e))
-                # Continue with other episodes
 
         self.logger.info(
             "Feed download complete",
@@ -186,7 +158,7 @@ class AudioDownloader:
         return results
 
     def download_to_local(self, episode: Episode, dest_dir: Path) -> Path:
-        """Download episode to local directory only (no GCS).
+        """Download episode to local directory.
 
         Args:
             episode: Episode to download.
@@ -195,6 +167,4 @@ class AudioDownloader:
         Returns:
             Path to downloaded file.
         """
-        return self.download_episode(
-            episode, local_dir=dest_dir, upload_to_gcs=False
-        )  # type: ignore
+        return self.download_episode(episode, local_dir=dest_dir)

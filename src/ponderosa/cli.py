@@ -11,7 +11,6 @@ from pathlib import Path
 from ponderosa.config import get_settings
 from ponderosa.ingestion import AudioDownloader, RSSParser
 from ponderosa.logging import setup_logging
-from ponderosa.storage import GCSClient
 
 
 def cmd_parse_feed(args: argparse.Namespace) -> int:
@@ -46,7 +45,6 @@ def cmd_parse_feed(args: argparse.Namespace) -> int:
 def cmd_download(args: argparse.Namespace) -> int:
     """Download episodes from a feed."""
     setup_logging(log_level="INFO")
-    settings = get_settings()
 
     parser = RSSParser(max_episodes=args.max_episodes)
     feed = parser.parse_feed(args.feed_url)
@@ -54,26 +52,14 @@ def cmd_download(args: argparse.Namespace) -> int:
     print(f"\nPodcast: {feed.title}")
     print(f"Episodes to download: {len(feed.episodes)}\n")
 
-    # Set up GCS client if configured
-    gcs_client = None
-    if args.upload and settings.gcp.bucket_name:
-        gcs_client = GCSClient(
-            bucket_name=settings.gcp.bucket_name,
-            project_id=settings.gcp.project_id,
-        )
-        print(f"Uploading to: gs://{settings.gcp.bucket_name}/")
+    downloader = AudioDownloader()
 
-    # Set up downloader
-    downloader = AudioDownloader(gcs_client=gcs_client)
-
-    # Download to local directory
     dest_dir = Path(args.output) if args.output else Path("./downloads")
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     results = downloader.download_feed(
         feed,
         local_dir=dest_dir,
-        upload_to_gcs=args.upload and gcs_client is not None,
         skip_existing=not args.force,
     )
 
@@ -84,28 +70,45 @@ def cmd_download(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_list_bucket(args: argparse.Namespace) -> int:
-    """List contents of the configured GCS bucket."""
+def cmd_transcribe(args: argparse.Namespace) -> int:
+    """Transcribe a local audio file."""
     setup_logging(log_level="INFO")
     settings = get_settings()
 
-    if not settings.gcp.bucket_name:
-        print("Error: GCP_BUCKET_NAME not configured")
+    audio_path = Path(args.audio_file)
+    if not audio_path.exists():
+        print(f"Error: File not found: {audio_path}")
         return 1
 
-    gcs_client = GCSClient(
-        bucket_name=settings.gcp.bucket_name,
-        project_id=settings.gcp.project_id,
+    from ponderosa.transcription import Transcriber
+
+    model_size = args.model or settings.whisper.model_size
+    transcriber = Transcriber(
+        model_size=model_size,
+        device=settings.whisper.device,
+        compute_type=settings.whisper.compute_type,
+        language=settings.whisper.language,
     )
 
-    blobs = gcs_client.list_blobs(prefix=args.prefix, max_results=args.max_results)
+    print(f"\nTranscribing: {audio_path}")
+    print(f"Model: {model_size}\n")
 
-    print(f"\nBucket: gs://{settings.gcp.bucket_name}/")
-    print(f"Prefix: {args.prefix or '(none)'}")
-    print(f"Found {len(blobs)} objects:\n")
+    result = transcriber.transcribe(audio_path)
 
-    for blob in blobs:
-        print(f"  {blob}")
+    # Determine output path
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        output_path = audio_path.with_suffix(".transcript.json")
+
+    output_path.write_text(
+        json.dumps(result.model_dump(), indent=2, default=str)
+    )
+
+    print(f"Language: {result.language}")
+    print(f"Duration: {result.duration:.1f}s")
+    print(f"Segments: {len(result.segments)}")
+    print(f"\nTranscript saved to: {output_path}")
 
     return 0
 
@@ -114,7 +117,7 @@ def main() -> int:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
         prog="ponderosa",
-        description="Podcast Intelligence Pipeline - Vertex AI MLOps project",
+        description="Podcast Intelligence Pipeline - Local transcription and enrichment",
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -134,17 +137,17 @@ def main() -> int:
         "--max-episodes", "-n", type=int, default=5, help="Max episodes to download"
     )
     dl_parser.add_argument("--output", "-o", help="Output directory")
-    dl_parser.add_argument("--upload", "-u", action="store_true", help="Upload to GCS")
     dl_parser.add_argument(
         "--force", "-f", action="store_true", help="Re-download existing files"
     )
     dl_parser.set_defaults(func=cmd_download)
 
-    # list-bucket command
-    list_parser = subparsers.add_parser("list-bucket", help="List GCS bucket contents")
-    list_parser.add_argument("--prefix", "-p", help="Filter by prefix")
-    list_parser.add_argument("--max-results", "-n", type=int, default=100)
-    list_parser.set_defaults(func=cmd_list_bucket)
+    # transcribe command
+    tr_parser = subparsers.add_parser("transcribe", help="Transcribe a local audio file")
+    tr_parser.add_argument("audio_file", help="Path to audio file (mp3, wav, etc.)")
+    tr_parser.add_argument("--model", "-m", help="Whisper model size (tiny, base, small, medium, large-v3)")
+    tr_parser.add_argument("--output", "-o", help="Output path for transcript JSON")
+    tr_parser.set_defaults(func=cmd_transcribe)
 
     args = parser.parse_args()
 

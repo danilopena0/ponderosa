@@ -71,7 +71,9 @@ data/
 credentials.json
 *.json.bak
 
+# Enrichment output
+enrichments/
+
 # OS files
 .DS_Store
 Thumbs.db
-/ac5653b38c87_moritz_heiden_moritz_seibert_trend_following_sprea.md

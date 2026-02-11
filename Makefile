@@ -1,4 +1,4 @@
-.PHONY: install install-dev test lint format typecheck clean run-parser run-download help
+.PHONY: install install-dev test lint format typecheck clean run-parser run-download enrich serve search help
 
 # Default target
 help:
@@ -18,6 +18,9 @@ help:
 	@echo "CLI Commands:"
 	@echo "  make run-parser    Parse Flirting with Models RSS feed"
 	@echo "  make run-download  Download episodes locally"
+	@echo "  make enrich        Enrich a transcript (set TRANSCRIPT=path)"
+	@echo "  make serve         Start the FastAPI search API"
+	@echo "  make search        Search enriched data (set QUERY=text)"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean         Remove build artifacts and caches"
@@ -55,6 +58,19 @@ run-parser:
 
 run-download:
 	uv run ponderosa download "https://flirtingwithmodels.libsyn.com/rss" -n 1 -o ./downloads
+
+# Enrichment & Search
+TRANSCRIPT ?= downloads/episode.transcript.json
+QUERY ?= trend following
+
+enrich:
+	uv run ponderosa enrich "$(TRANSCRIPT)"
+
+serve:
+	uv run ponderosa serve --reload
+
+search:
+	uv run ponderosa search "$(QUERY)"
 
 # Cleanup
 clean:

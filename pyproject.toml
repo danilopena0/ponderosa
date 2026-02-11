@@ -21,6 +21,12 @@ dependencies = [
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
 
+    # Vector storage
+    "chromadb>=0.4.0",
+
+    # LLM (Perplexity uses OpenAI-compatible API)
+    "openai>=1.0.0",
+
     # Utilities
     "python-dotenv>=1.0.0",
     "structlog>=23.2.0",

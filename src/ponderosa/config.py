@@ -38,6 +38,30 @@ class PodcastSettings(BaseSettings):
     skip_existing: bool = Field(default=True, description="Skip already downloaded episodes")
 
 
+class PerplexitySettings(BaseSettings):
+    """Perplexity API configuration for enrichment."""
+
+    model_config = SettingsConfigDict(env_prefix="PERPLEXITY_", env_file=".env", extra="ignore")
+
+    api_key: str = Field(default="", description="Perplexity API key")
+    base_url: str = Field(
+        default="https://api.perplexity.ai", description="Perplexity API base URL"
+    )
+    model: str = Field(
+        default="sonar-pro", description="Perplexity model name"
+    )
+
+
+class ChromaSettings(BaseSettings):
+    """ChromaDB configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="CHROMA_", env_file=".env", extra="ignore")
+
+    persist_directory: str = Field(
+        default="./data/chromadb", description="ChromaDB persistence directory"
+    )
+
+
 class Settings(BaseSettings):
     """Main application settings aggregating all config sections."""
 
@@ -59,6 +83,8 @@ class Settings(BaseSettings):
     # Sub-configurations
     whisper: WhisperSettings = Field(default_factory=WhisperSettings)
     podcast: PodcastSettings = Field(default_factory=PodcastSettings)
+    perplexity: PerplexitySettings = Field(default_factory=PerplexitySettings)
+    chroma: ChromaSettings = Field(default_factory=ChromaSettings)
 
 
 @lru_cache

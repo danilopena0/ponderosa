@@ -8,9 +8,9 @@ Ponderosa processes podcasts through a complete pipeline — all running locally
 
 1. **Ingestion** - Parse RSS feeds and download audio locally
 2. **Transcription** - Convert audio to text using faster-whisper (local Whisper)
-3. **Enrichment** - Summarize and extract topics (coming soon)
-4. **Search** - Semantic search (coming soon)
-5. **API** - FastAPI interface (coming soon)
+3. **Enrichment** - Extract themes, learnings, and strategies via Perplexity API
+4. **Storage** - Semantic vector storage with ChromaDB
+5. **Search** - Semantic search via CLI or FastAPI API
 
 ## Quick Start
 
@@ -116,6 +116,66 @@ uv run ponderosa transcribe <audio_file> [options]
 
 The transcript JSON includes the full text, timestamped segments, detected language, and duration.
 
+### `enrich` - Extract insights from a transcript
+
+```bash
+uv run ponderosa enrich <transcript.json> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-o`, `--output` | Save enrichment JSON to file |
+
+### `episodes` - List all enriched episodes
+
+```bash
+uv run ponderosa episodes
+```
+
+Shows all episodes stored in ChromaDB with their IDs, titles, and insight counts.
+
+### `episode` - Show details for an episode and export to markdown
+
+```bash
+uv run ponderosa episode <episode_id> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-o`, `--output` | Output markdown file path (default: `<episode_id>.md`) |
+
+Generates a markdown file with the episode's summary, themes, learnings, and strategies.
+
+### `search` - Search enriched podcast data
+
+```bash
+uv run ponderosa search <query> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `-l`, `--limit` | Max results per category (default: 10) |
+
+### `serve` - Start the FastAPI search API
+
+```bash
+uv run ponderosa serve [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--host` | Host to bind (default: `127.0.0.1`) |
+| `-p`, `--port` | Port (default: `8000`) |
+| `--reload` | Enable auto-reload for development |
+
+API endpoints:
+- `GET /episodes` — list all enriched episodes
+- `GET /episodes/{id}` — full enrichment for an episode
+- `GET /search?q=...&limit=10` — search across all collections
+- `GET /search/themes?q=...` — search themes
+- `GET /search/learnings?q=...` — search learnings
+- `GET /search/strategies?q=...` — search strategies
+
 ## Configuration
 
 Configuration is loaded from environment variables or a `.env` file. See [.env.example](.env.example) for all options.
@@ -146,9 +206,10 @@ ponderosa/
 │   ├── logging.py          # Structured logging setup
 │   ├── ingestion/          # RSS parsing & audio download
 │   ├── transcription/      # faster-whisper transcription
-│   ├── enrichment/         # Summarization (planned)
-│   ├── storage/            # Storage utilities (planned)
-│   └── search/             # Semantic search (planned)
+│   ├── enrichment/         # Perplexity-based insight extraction
+│   ├── storage/            # ChromaDB vector storage
+│   ├── api.py              # FastAPI search API
+│   └── search/             # Search utilities
 ├── tests/                  # Test suite
 └── docs/                   # Documentation
 ```

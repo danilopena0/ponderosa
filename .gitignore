@@ -63,15 +63,15 @@ dmypy.json
 # Local downloads
 downloads/
 
-# GCP credentials (never commit!)
+# ChromaDB data
+data/
+
+# Credentials (never commit!)
 *-sa-key.json
 credentials.json
 *.json.bak
 
-# Compiled pipeline artifacts
-*.yaml.compiled
-pipeline_*.yaml
-
 # OS files
 .DS_Store
 Thumbs.db
+/ac5653b38c87_moritz_heiden_moritz_seibert_trend_following_sprea.md

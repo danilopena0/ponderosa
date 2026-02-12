@@ -35,27 +35,16 @@ def setup_logging(
         structlog.stdlib.ExtraAdder(),
     ]
 
-    if json_format:
-        # Production: JSON output
-        structlog.configure(
-            processors=shared_processors
-            + [
-                structlog.processors.JSONRenderer(),
-            ],
-            wrapper_class=structlog.stdlib.BoundLogger,
-            context_class=dict,
-            logger_factory=structlog.stdlib.LoggerFactory(),
-            cache_logger_on_first_use=True,
-        )
-    else:
-        # Development: colored console output
-        structlog.configure(
-            processors=shared_processors
-            + [
-                structlog.dev.ConsoleRenderer(colors=True),
-            ],
-            wrapper_class=structlog.stdlib.BoundLogger,
-            context_class=dict,
-            logger_factory=structlog.stdlib.LoggerFactory(),
-            cache_logger_on_first_use=True,
-        )
+    renderer: structlog.types.Processor = (
+        structlog.processors.JSONRenderer()
+        if json_format
+        else structlog.dev.ConsoleRenderer(colors=True)
+    )
+
+    structlog.configure(
+        processors=shared_processors + [renderer],
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=True,
+    )

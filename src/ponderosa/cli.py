@@ -127,7 +127,6 @@ def cmd_enrich(args: argparse.Namespace) -> int:
     setup_logging(log_level="INFO")
 
     from ponderosa.enrichment import Enricher
-    from ponderosa.storage import PonderosaStore
 
     transcript_path = Path(args.transcript)
     if not transcript_path.exists():

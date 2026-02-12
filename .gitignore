@@ -11,7 +11,6 @@ __pycache__/
 build/
 develop-eggs/
 dist/
-downloads/
 eggs/
 .eggs/
 lib/
@@ -73,6 +72,10 @@ credentials.json
 
 # Enrichment output
 enrichments/
+
+# Claude Code
+.claude/agents/
+.claude/skills/
 
 # OS files
 .DS_Store

@@ -4,12 +4,6 @@ import pytest
 
 
 @pytest.fixture
-def sample_rss_feed_url() -> str:
-    """Flirting with Models podcast RSS feed."""
-    return "https://flirtingwithmodels.libsyn.com/rss"
-
-
-@pytest.fixture
 def sample_episode_data() -> dict:
     """Sample episode data for testing."""
     return {

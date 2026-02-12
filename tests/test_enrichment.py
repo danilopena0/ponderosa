@@ -90,30 +90,38 @@ class TestChunking:
 
 
 class TestEnricher:
-    @patch("ponderosa.enrichment.get_settings")
-    @patch("ponderosa.enrichment.OpenAI")
-    def test_enrich_transcript(self, mock_openai_cls, mock_settings, tmp_path):
-        # Setup mock settings
+    def _setup_enricher_mocks(
+        self,
+        mock_settings: MagicMock,
+        mock_openai_cls: MagicMock,
+        response_content: str = MOCK_PERPLEXITY_RESPONSE,
+    ) -> tuple[MagicMock, Enricher]:
+        """Configure common mocks for Enricher tests and return (mock_client, enricher)."""
         mock_settings.return_value.perplexity.api_key = "test-key"
         mock_settings.return_value.perplexity.base_url = "https://api.perplexity.ai"
         mock_settings.return_value.perplexity.model = "sonar-pro"
 
-        # Setup mock OpenAI client
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
 
         mock_choice = MagicMock()
-        mock_choice.message.content = MOCK_PERPLEXITY_RESPONSE
+        mock_choice.message.content = response_content
         mock_response = MagicMock()
         mock_response.choices = [mock_choice]
         mock_client.chat.completions.create.return_value = mock_response
+
+        return mock_client, Enricher()
+
+    @patch("ponderosa.enrichment.get_settings")
+    @patch("ponderosa.enrichment.OpenAI")
+    def test_enrich_transcript(self, mock_openai_cls, mock_settings, tmp_path):
+        mock_client, enricher = self._setup_enricher_mocks(mock_settings, mock_openai_cls)
 
         # Create test transcript
         transcript = {"text": "This is a test transcript about market trends."}
         transcript_path = tmp_path / "test.transcript.json"
         transcript_path.write_text(json.dumps(transcript))
 
-        enricher = Enricher()
         result = enricher.enrich_transcript(transcript_path)
 
         assert isinstance(result, EnrichmentResult)
@@ -125,26 +133,15 @@ class TestEnricher:
     @patch("ponderosa.enrichment.get_settings")
     @patch("ponderosa.enrichment.OpenAI")
     def test_enrich_strips_markdown_fences(self, mock_openai_cls, mock_settings, tmp_path):
-        mock_settings.return_value.perplexity.api_key = "test-key"
-        mock_settings.return_value.perplexity.base_url = "https://api.perplexity.ai"
-        mock_settings.return_value.perplexity.model = "sonar-pro"
-
-        mock_client = MagicMock()
-        mock_openai_cls.return_value = mock_client
-
-        # Wrap response in markdown code fences
         fenced = f"```json\n{MOCK_PERPLEXITY_RESPONSE}\n```"
-        mock_choice = MagicMock()
-        mock_choice.message.content = fenced
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_client, enricher = self._setup_enricher_mocks(
+            mock_settings, mock_openai_cls, response_content=fenced,
+        )
 
         transcript = {"text": "Test transcript."}
         transcript_path = tmp_path / "test.transcript.json"
         transcript_path.write_text(json.dumps(transcript))
 
-        enricher = Enricher()
         result = enricher.enrich_transcript(transcript_path)
 
         assert result.episode_title == "Test Episode: Market Trends"
@@ -152,18 +149,7 @@ class TestEnricher:
     @patch("ponderosa.enrichment.get_settings")
     @patch("ponderosa.enrichment.OpenAI")
     def test_enrich_uses_segments_fallback(self, mock_openai_cls, mock_settings, tmp_path):
-        mock_settings.return_value.perplexity.api_key = "test-key"
-        mock_settings.return_value.perplexity.base_url = "https://api.perplexity.ai"
-        mock_settings.return_value.perplexity.model = "sonar-pro"
-
-        mock_client = MagicMock()
-        mock_openai_cls.return_value = mock_client
-
-        mock_choice = MagicMock()
-        mock_choice.message.content = MOCK_PERPLEXITY_RESPONSE
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_client, enricher = self._setup_enricher_mocks(mock_settings, mock_openai_cls)
 
         # Transcript with segments but no top-level text
         transcript = {
@@ -176,7 +162,6 @@ class TestEnricher:
         transcript_path = tmp_path / "test.transcript.json"
         transcript_path.write_text(json.dumps(transcript))
 
-        enricher = Enricher()
         result = enricher.enrich_transcript(transcript_path)
 
         # Verify the call was made (segments were concatenated)
@@ -189,18 +174,7 @@ class TestEnricher:
     @patch("ponderosa.enrichment.get_settings")
     @patch("ponderosa.enrichment.OpenAI")
     def test_enrich_chunks_long_transcript(self, mock_openai_cls, mock_settings, mock_chunk, tmp_path):
-        mock_settings.return_value.perplexity.api_key = "test-key"
-        mock_settings.return_value.perplexity.base_url = "https://api.perplexity.ai"
-        mock_settings.return_value.perplexity.model = "sonar-pro"
-
-        mock_client = MagicMock()
-        mock_openai_cls.return_value = mock_client
-
-        mock_choice = MagicMock()
-        mock_choice.message.content = MOCK_PERPLEXITY_RESPONSE
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_client, enricher = self._setup_enricher_mocks(mock_settings, mock_openai_cls)
 
         # Force chunking into 2 pieces
         mock_chunk.return_value = ["Chunk one text.", "Chunk two text."]
@@ -209,7 +183,6 @@ class TestEnricher:
         transcript_path = tmp_path / "test.transcript.json"
         transcript_path.write_text(json.dumps(transcript))
 
-        enricher = Enricher()
         result = enricher.enrich_transcript(transcript_path)
 
         assert isinstance(result, EnrichmentResult)

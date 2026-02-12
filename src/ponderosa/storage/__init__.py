@@ -45,10 +45,10 @@ class PonderosaStore:
         # Check if this episode already exists
         existing = self.episodes.get(ids=[episode_id])
         if existing["ids"]:
-            print(f"  Episode '{episode_id}' already exists — upserting (overwriting)")
+            self.logger.info("Episode already exists, upserting", episode_id=episode_id)
             self.logger.info("Upserting existing episode", episode_id=episode_id)
         else:
-            print(f"  Storing new episode: {episode_id}")
+            self.logger.info("Storing new episode", episode_id=episode_id)
             self.logger.info("Storing new episode", episode_id=episode_id)
 
         short_id = make_short_id(episode_id)

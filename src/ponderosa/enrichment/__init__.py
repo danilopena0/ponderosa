@@ -8,7 +8,7 @@ from pathlib import Path
 
 import structlog
 from openai import OpenAI
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from ponderosa.config import get_settings
 
@@ -152,25 +152,25 @@ class Enricher:
             segments = data.get("segments", [])
             text = " ".join(s.get("text", "") for s in segments)
 
-        print(f"  Transcript length: {len(text):,} chars")
+        self.logger.info("Transcript length", chars=len(text))
 
         chunks = _chunk_text(text)
 
         if len(chunks) == 1:
-            print(f"  Sending to Perplexity ({self.model})... this may take 30-60s")
+            self.logger.info("Sending single chunk to Perplexity", model=self.model)
             self.logger.info("Sending single chunk to Perplexity", model=self.model, chars=len(text))
             return self._enrich_single(chunks[0])
 
-        print(f"  Transcript split into {len(chunks)} chunks (overlap: {CHUNK_OVERLAP:,} chars)")
+        self.logger.info("Transcript split into chunks", chunks=len(chunks), overlap=CHUNK_OVERLAP)
         self.logger.info("Chunking transcript", chunks=len(chunks), chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP)
         chunk_results = []
         for i, chunk in enumerate(chunks, 1):
-            print(f"  Processing chunk {i}/{len(chunks)} ({len(chunk):,} chars)...")
+            self.logger.info("Processing chunk", chunk=i, total=len(chunks), chars=len(chunk))
             self.logger.info("Processing chunk", chunk=i, total=len(chunks), chars=len(chunk))
             result = self._enrich_single(chunk)
             chunk_results.append(result)
 
-        print("  Merging chunk results...")
+        self.logger.info("Merging chunk results")
         self.logger.info("Merging chunk results", chunks=len(chunk_results))
         merged = self._merge_results(chunk_results)
 
@@ -196,17 +196,24 @@ class Enricher:
                 ],
             )
 
-            raw = response.choices[0].message.content.strip()
+            content = response.choices[0].message.content
+            if content is None:
+                raise RuntimeError("LLM returned empty content")
+            raw = content.strip()
             raw = _strip_code_fences(raw)
 
             try:
                 parsed = json.loads(raw)
                 return EnrichmentResult(**parsed)
-            except (json.JSONDecodeError, Exception) as e:
+            except (json.JSONDecodeError, ValidationError) as e:
                 last_error = e
                 if attempt <= MAX_RETRIES:
-                    print(f"  Validation failed (attempt {attempt}/{MAX_RETRIES + 1}): {e}")
-                    print(f"  Retrying...")
+                    self.logger.info(
+                        "Validation failed, retrying",
+                        attempt=attempt,
+                        max_attempts=MAX_RETRIES + 1,
+                        error=str(e),
+                    )
                     self.logger.warning(
                         "LLM response validation failed, retrying",
                         attempt=attempt,

@@ -1,13 +1,14 @@
 """FastAPI search API for querying enriched podcast data."""
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 
+from ponderosa import __version__
 from ponderosa.storage import PonderosaStore
 
 app = FastAPI(
     title="Ponderosa",
     description="Podcast Intelligence Pipeline - Search API",
-    version="0.1.0",
+    version=__version__,
 )
 
 _store: PonderosaStore | None = None
@@ -31,7 +32,7 @@ def get_episode(episode_id: str):
     """Get full enrichment for an episode."""
     result = get_store().get_episode(episode_id)
     if result is None:
-        return {"error": "Episode not found"}
+        raise HTTPException(status_code=404, detail="Episode not found")
     return result
 
 

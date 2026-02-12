@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ponderosa.cli import cmd_download, cmd_parse_feed, cmd_transcribe, main
+from ponderosa.cli import main
 from ponderosa.ingestion.rss_parser import Episode, PodcastFeed
 
 

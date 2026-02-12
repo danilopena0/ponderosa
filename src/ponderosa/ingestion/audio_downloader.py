@@ -156,15 +156,3 @@ class AudioDownloader:
         )
 
         return results
-
-    def download_to_local(self, episode: Episode, dest_dir: Path) -> Path:
-        """Download episode to local directory.
-
-        Args:
-            episode: Episode to download.
-            dest_dir: Destination directory.
-
-        Returns:
-            Path to downloaded file.
-        """
-        return self.download_episode(episode, local_dir=dest_dir)

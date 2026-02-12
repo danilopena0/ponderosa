@@ -1,6 +1,5 @@
 """Transcription module using faster-whisper for local speech-to-text."""
 
-import json
 from pathlib import Path
 
 import structlog

@@ -12,6 +12,13 @@ Ponderosa processes podcasts through a complete pipeline — all running locally
 4. **Storage** - Semantic vector storage with ChromaDB
 5. **Search** - Semantic search via CLI or FastAPI API
 
+## Demo
+
+
+https://github.com/user-attachments/assets/cf5f13a2-f6fd-4f0b-beb8-9d1f78f61490
+
+
+
 ## Quick Start
 
 ### Prerequisites
